@@ -16,26 +16,36 @@ def newton_x(x)
   x - function(x) / derivative_1(x)
 end
 
+def big_m2(*xs)
+  xs.map { |x| derivative_2(x).abs }.max
+end
+
+def m1(*xs)
+  xs.map { |x| derivative_1(x).abs }.min
+end
+
 def find_newton_root(a, b, x_eps, f_eps)
-  x = if (function(a) * derivative_2(a)).positive?
+  x_0 = x = if (function(a) * derivative_2(a)).positive?
       a
     else
       b
     end
 
   n_x = 0
-  n_f = 1
 
   begin
     prev_x, x = x, newton_x(x)
+    x_diff = (x - prev_x).abs
     f_x = function(x)
     n_x += 1
-    n_f += 2
-  end until (x - prev_x).abs < x_eps && f_x.abs < f_eps
+  end until x_diff < x_eps && f_x.abs < f_eps
 
-  conv_rate = derivative_2(x).abs / (2 * derivative_1(x).abs)
+  n_f = 1 + n_x * 2
 
-  { x: x, f_x: f_x, n_x: n_x, n_f: n_f, conv_rate: conv_rate }
+  conv_rate = big_m2(a, x, b) / (2 * m1(a, x, b))
+  error = conv_rate.truncate(20) ** (2 ** n_x - 1) * (x - x_0).abs ** (2 ** n_x)
+
+  { x: x, f_x: f_x, n_x: n_x, n_f: n_f, conv_rate: conv_rate, error: error }
 end
 
 def find_roots(range, grid_step, x_eps, f_eps)
@@ -57,13 +67,12 @@ def find_roots(range, grid_step, x_eps, f_eps)
   }
 end
 
-def pluralize(w, n)
-  w + (n == 1 ? "" : ?s)
-end
+def pluralize(w, n) w + (n == 1 ? "" : ?s) end
+def inspect_bigdecimal(f) f.round(30).to_s(?F) end
 
 def get_big_decimal(desc)
-  $> << "Fill in the #{desc} (*required, decimal): "
-  BigDecimal(gets).tap { |val| puts "#{desc.capitalize}: #{val}" }
+  $> << "Set the #{desc} (*required, decimal): "
+  BigDecimal(gets).tap { |val| puts "#{desc.capitalize} set to #{val}" }
 end
 
 puts "Finding roots of f(x) = 4x^4 - 6.2 - cos0.6x with Newton's method"
@@ -74,17 +83,16 @@ x_eps = get_big_decimal("argument precision")
 f_eps = get_big_decimal("value precision")
 puts
 
-res = find_roots(lower..upper, BigDecimal("1e-1"), x_eps, f_eps)
+grid_step = [(upper - lower) / 1000, BigDecimal("1e-1")].min
 
-puts "#{res[:roots].count} #{pluralize("root", res[:roots].count)} found between #{lower} and #{upper}"
-puts
+res = find_roots(lower..upper, grid_step, x_eps, f_eps)
 
-res[:roots].each.with_index do |root, index|
-  puts "ξ_#{index + 1} = #{root[:x].round(20).to_s(?F)}"
-  puts "f(ξ_#{index + 1}) = #{root[:f_x].round(20).to_s(?F)}"
-  puts "#{root[:n_x]} #{pluralize("iteration", root[:n_x])}, #{root[:n_f]} #{pluralize("f(x) computation", root[:n_f])}"
-  puts "convergence rate = #{root[:conv_rate].round(20).to_s(?F)}"
+puts "#{res[:roots].count} #{pluralize("root", res[:roots].count)} found between [#{lower}; #{upper}] with grid step #{grid_step} in #{(res[:time] * 1000).round(3)} ms"
+
+res[:roots].each.with_index do |root, j|
+  i = j + 1
   puts
+  puts "ξ_#{i} = #{inspect_bigdecimal(root[:x])}, error = #{inspect_bigdecimal(root[:error])}"
+  puts "f(ξ_#{i}) = #{inspect_bigdecimal(root[:f_x])}"
+  puts "#{root[:n_x]} #{pluralize("iteration", root[:n_x])}, #{root[:n_f]} #{pluralize("f(x) computation", root[:n_f])}, convergence rate = #{inspect_bigdecimal(root[:conv_rate])}"
 end
-
-puts "t = #{(res[:time] * 1000).round(3)} ms"
