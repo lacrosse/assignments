@@ -50,40 +50,20 @@ list_partition_([H | T], N, L2, [H | TL3]) :-
 
 % 5
 
-consonant(C) :- name("bcdfghjklmnpqrstvwxz", Consonants), memberchk(C, Consonants).
-consonant_and_char(A, B, C) :- consonant(A), name(C, [B]).
-consonant_and_o(A, B) :- consonant_and_char(A, B, "o").
-consonant_and_y(A, B) :- consonant_and_char(A, B, "y").
-consonant_and_o_or_y(A, B) :- consonant_and_y(A, B).
-consonant_and_o_or_y(A, B) :- consonant_and_o(A, B).
+is_lowercase_consonant(C) :- sub_string("bcdfghjklmnpqrstvwxz", _, 1, _, C), !.
 
-list_string_concat(L, S1, S2) :-
-  name(P, L),
-  string_concat(P, S1, S2).
-
-inflect([SecondToLast, Last], Inflection) :-
-  consonant_and_o(SecondToLast, Last),
-  list_string_concat([SecondToLast], "oes", Inflection).
-
-inflect([SecondToLast, Last], Inflection) :-
-  consonant_and_y(SecondToLast, Last),
-  list_string_concat([SecondToLast], "ies", Inflection).
-
-inflect([SecondToLast, Last], Inflection) :-
-  \+consonant_and_o_or_y(SecondToLast, Last),
-  list_string_concat([SecondToLast, Last], "s", Inflection).
-
-inflect([Last], Inflection) :-
-  list_string_concat([Last], "s", Inflection).
-
-pluralize(Singular, Plural) :-
-  name(Singular, List),
-  append(Init, [SecondToLast, Last], List),
-  name(InitString, Init),
-  inflect([SecondToLast, Last], Inflection),
-  string_concat(InitString, Inflection, Plural).
-
-pluralize(Singular, Plural) :-
-  name(Singular, List),
-  [_] = List,
-  inflect(List, Plural).
+pluralize(Singular, Inflection) :-
+  sub_string(Singular, _, 1, 1, Penultimate)
+  -> (
+    is_lowercase_consonant(Penultimate)
+    -> (
+      sub_string(Singular, _, _, 0, "o")
+      ->  string_concat(Singular, "es", Inflection)
+      ;   sub_string(Singular, _, _, 0, "y")
+      ->  sub_string(Singular, 0, _, 1, Init),
+          string_concat(Init, "ies", Inflection)
+      ;   string_concat(Singular, "s", Inflection)
+    )
+    ; string_concat(Singular, "s", Inflection)
+  )
+  ; string_concat(Singular, "s", Inflection).
