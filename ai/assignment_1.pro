@@ -22,11 +22,15 @@ subst([Z | VTail], X, Y, [Z | LTail]) :-
 
 % 3
 
-number_partition(X, Y, Z) :-
-  Z_ is Z - 1,
-  between(1, Z_, X),
-  between(1, Z_, Y),
-  plus(X, Y, Z).
+plus(X, Y, Z) :-
+  number(Z),
+  between(0, Z, Y),
+  X is Z - Y.
+
+plus(X, Y, Z) :-
+  number(X),
+  number(Y),
+  Z is X + Y.
 
 % 4
 
