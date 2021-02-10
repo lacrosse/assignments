@@ -11,9 +11,12 @@ p([VH | VT], L) :-
 
 % 2
 
-subst([], X, Y, []).
-subst([X|VTail], X, Y, [Y|LTail]):- subst(VTail, X, Y, LTail).
-subst([Z|VTail], X, Y, [Z|LTail]):- Z \= X, subst(VTail, X, Y, LTail).
+subst([], _, _, []).
+subst([X | VTail], X, Y, [Y | LTail]) :-
+  subst(VTail, X, Y, LTail).
+subst([Z | VTail], X, Y, [Z | LTail]) :-
+  Z \= X,
+  subst(VTail, X, Y, LTail).
 
 % 3
 
