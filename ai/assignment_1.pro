@@ -34,10 +34,19 @@ plus(X, Y, Z) :-
 
 % 4
 
+:- use_module(library(apply)).
+
 list_partition(L1, N, L2, L3) :-
-  Comp = >(N),
-  include(Comp, L1, L2),
-  exclude(Comp, L1, L3).
+  partition(>(N), L1, L2, L3).
+
+% 4'
+
+list_partition_([], _, [], []).
+list_partition_([H | T], N, [H | TL2], L3) :-
+  H < N, !,
+  list_partition_(T, N, TL2, L3).
+list_partition_([H | T], N, L2, [H | TL3]) :-
+  list_partition_(T, N, L2, TL3).
 
 % 5
 
