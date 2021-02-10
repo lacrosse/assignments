@@ -4,7 +4,8 @@ p([], []).
 p([VH | VT], [VH | LT]) :-
   member(VH, VT),
   delete(VT, VH, VTWithoutVH),
-  p(VTWithoutVH, LT).
+  p(VTWithoutVH, LT),
+  !.
 p([VH | VT], L) :-
   \+member(VH, VT),
   p(VT, L).
@@ -13,7 +14,8 @@ p([VH | VT], L) :-
 
 subst([], _, _, []).
 subst([X | VTail], X, Y, [Y | LTail]) :-
-  subst(VTail, X, Y, LTail).
+  subst(VTail, X, Y, LTail),
+  !.
 subst([Z | VTail], X, Y, [Z | LTail]) :-
   Z \= X,
   subst(VTail, X, Y, LTail).
