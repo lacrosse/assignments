@@ -1,20 +1,13 @@
 % 1
 
-distinct(A, B):-
-  distinct(A, [], B).
-distinct([], B, B).
-distinct([H | T], Acc, B):-
-  member(H, Acc),
-  distinct(T, Acc, B).
-distinct([H | T], Acc, B):-
-  \+member(H, Acc),
-  distinct(T, [H | Acc], B).
-
-p(V, L):-
-  distinct(V, VDistinct),
-  msort(VDistinct, VDistinctSorted),
-  msort(L, LSorted),
-  VDistinctSorted = LSorted.
+p([], []).
+p([VH | VT], [VH | LT]) :-
+  member(VH, VT),
+  delete(VT, VH, VTWithoutVH),
+  p(VTWithoutVH, LT).
+p([VH | VT], L) :-
+  \+member(VH, VT),
+  p(VT, L).
 
 % 2
 
