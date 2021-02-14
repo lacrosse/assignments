@@ -8,7 +8,7 @@ namespace ConsoleLoader
 {
     class Program
     {
-        static double readDouble()
+        static double ReadDouble()
         {
             string str;
             
@@ -21,7 +21,7 @@ namespace ConsoleLoader
                 }
                 catch (FormatException)
                 {
-                    Console.WriteLine($"I can't parse {str}. Try again.");
+                    Console.WriteLine($"I can't parse {str}, Dave. Try again.");
                 }
             }
         }
@@ -37,26 +37,26 @@ namespace ConsoleLoader
 
             Console.WriteLine("Give me a value, I'll assume it's ohms and create a resistor for you:");
 
-            component = new Model.Resistor(readDouble());
+            component = new Model.Resistor(ReadDouble());
 
             Console.WriteLine($"Here's your component: {component}.");
             Console.WriteLine($"Resistor's impedance is constant and equals {component.Impedance(0)} ohm for any jω. It's so great that we have Unicode.");
             Console.WriteLine("Moving on. Give me farads and I'll create a capacitor:");
 
-            component = new Model.Capacitor(readDouble());
+            component = new Model.Capacitor(ReadDouble());
 
             Console.WriteLine($"Here's your component: {component}. Now give me a jω argument for the impedance function:");
 
-            double var = readDouble();
+            double var = ReadDouble();
 
             Console.WriteLine($"Capacitor's impedance equals {component.Impedance(var)} ohm at {var}.");
             Console.WriteLine("One more. Give me henries and I'll create an inductor:");
 
-            component = new Model.Inductor(readDouble());
+            component = new Model.Inductor(ReadDouble());
 
             Console.WriteLine($"Here's your component: {component}. Now give me a jω argument for the impedance function:");
 
-            var = readDouble();
+            var = ReadDouble();
 
             Console.WriteLine($"Inductor's impedance equals {component.Impedance(var)} ohm at {var}.");
             Console.WriteLine("Thank you, Dave. See you later. Press any key to put me to sleep.");

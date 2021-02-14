@@ -1,17 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 namespace Model
 {
+    [XmlInclude(typeof(Resistor))]
+    [XmlInclude(typeof(Capacitor))]
+    [XmlInclude(typeof(Inductor))]
     public abstract class PassiveComponent
     {
         public PassiveComponent(double var)
         {
             ComponentVariable = var;
         }
+        public PassiveComponent() { }
 
         public abstract string Name { get; }
         public abstract string ShortName { get; }
@@ -37,6 +38,7 @@ namespace Model
     public class Resistor : PassiveComponent
     {
         public Resistor(double resistance) : base(resistance) { }
+        public Resistor(): base() { }
 
         public override string Name { get => "resistor"; }
         public override string ShortName { get => "R"; }
@@ -48,6 +50,7 @@ namespace Model
     public class Capacitor : PassiveComponent
     {
         public Capacitor(double capacitance) : base(capacitance) { }
+        public Capacitor(): base() { }
 
         public override string Name { get => "capacitor"; }
         public override string ShortName { get => "C"; }
@@ -59,6 +62,7 @@ namespace Model
     public class Inductor : PassiveComponent
     {
         public Inductor(double inductance) : base(inductance) { }
+        public Inductor() : base() { }
 
         public override string Name { get => "inductor"; }
         public override string ShortName { get => "L"; }
