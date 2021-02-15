@@ -10,15 +10,15 @@ deepen(state(A, B, A, A), state(B, B, A, B)).
 deepen(state(A, B, A, B), state(B, B, A, B)).
 deepen(state(A, B, A, B), state(B, B, B, B)).
 
-depth(Path, State, [State | Path]):-
+depth(Path, State, [State | Path]) :-
   goal(State), !.
 
-depth(Path, State, Solution):-
+depth(Path, State, Solution) :-
   deepen(State, DeepState),
   \+memberchk(DeepState, Path),
   state(NextFarmer, NextWolf, NextGoat, NextCabbage) = DeepState,
   \+memberchk(state(NextFarmer, NextCabbage, NextGoat, NextWolf), Path),
   depth([State | Path], DeepState, Solution).
 
-solve(State, Solution):-
+solve(State, Solution) :-
   depth([], State, Solution).
