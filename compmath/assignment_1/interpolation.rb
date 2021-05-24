@@ -19,22 +19,28 @@ def div_diffs(tuples)
   end
 end
 
-def lagrange_polynomial_with_error(xys, order, x)
-  windowed_xys = xys[0..order]
-  value =
-    windowed_xys.zip(0..).sum do |(grid_x, grid_y), i|
-      other_xys = windowed_xys[0, i] + windowed_xys[i + 1..order]
+def lagrange_window(xys, order, x)
+  start_index = xys[0, xys.size - order].rindex { |xy| xy[0] <= x }
+  xys[start_index, order + 1]
+end
 
-      bp_num = other_xys.map { |xy| x - xy[0] }.reduce(:*)
-      bp_den = other_xys.map { |xy| grid_x - xy[0] }.reduce(:*)
+def lagrange_polynomial_with_error(xys, order, x)
+  window = lagrange_window(xys, order, x)
+
+  value =
+    window.zip(0..order).sum do |(grid_x, grid_y), i|
+      outer_window = window[0, i] + window[i + 1..order]
+
+      bp_num = outer_window.map { |xy| x - xy[0] }.reduce(:*)
+      bp_den = outer_window.map { |xy| grid_x - xy[0] }.reduce(:*)
       basis_polynomial = bp_num / bp_den
 
       grid_y * basis_polynomial
     end
 
-  dds = div_diffs(windowed_xys)
+  dds = div_diffs(window)
   mnp1 = dds * factorial(order + 1)
-  diff_prod = windowed_xys.map { |xy| x - xy[0] }.reduce(:*)
+  diff_prod = window.map { |xy| x - xy[0] }.reduce(:*)
   error = (dds * diff_prod).abs
 
   [value, error]
