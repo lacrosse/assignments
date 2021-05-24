@@ -3,43 +3,46 @@ require "bigdecimal/math"
 PI = BigMath.PI(100)
 
 class LagrangePolynomial
-  def initialize(xs, ys)
-    @xs = xs
-    @ys = ys
+  def initialize(xys, order)
+    @xys = xys
+    @order = order
   end
 
-  def order
-    @ys.count
+  def index_window(x)
+    start_index = @xys[0, @xys.size - @order].rindex { |xy| xy[0] <= x }
+    start_index..start_index + @order
   end
 
-  def derivative(n, x)
-    range = (0...order).to_a
+  def derivative_with_error(n, x)
+    range = index_window(x)
 
-    range.sum do |i|
-      subrange = range - [i]
+    window = @xys[range]
+
+    value = range.sum do |i|
+      subrange = range.to_a - [i]
       numerator =
         factorial(n) *
         subrange
-          .map { |j| x - @xs[j] }
+          .map { |j| x - @xys[j][0] }
           .combination(subrange.count - n)
           .sum { |c| c.reduce(:*) }
       denominator =
         subrange
-          .reduce(1) { |p, j| p * (@xs[i] - @xs[j]) }
+          .reduce(1) { |p, j| p * (@xys[i][0] - @xys[j][0]) }
 
-      @ys[i] * numerator / denominator
+      @xys[i][1] * numerator / denominator
     end
-  end
 
-  def derivative_error(n, x)
     sum_of_prods =
       factorial(n) *
-      @xs
-        .map { |x_i| x - x_i }
-        .combination(@xs.count - n)
+      window
+        .map { |x_i, _| x - x_i }
+        .combination(window.count - n)
         .sum { |c| c.reduce(:*) }
 
-    div_diffs(@xs.zip(@ys)) * sum_of_prods.abs
+    error = div_diffs(range.begin, range.end) * sum_of_prods.abs
+
+    [value, error]
   end
 
   private
@@ -48,12 +51,21 @@ class LagrangePolynomial
     n <= 1 ? 1 : (1..n).reduce(:*)
   end
 
-  def div_diffs(tuples)
-    if tuples.count == 1
-      tuples[0][1]
+  def div_diffs(from, to)
+    if from == to
+      @xys[from][1]
     else
-      div_diffs(tuples[1..-1]) - div_diffs(tuples[0..-2]) / (tuples[-1][0] - tuples[0][0])
+      div_diffs(from + 1, to) - div_diffs(from, to - 1) / (@xys[to][0] - @xys[from][0])
     end
+  end
+end
+
+def get_int(desc, min:, max:)
+  $> << "Set the #{desc} (*required, integer): "
+  Integer(gets).tap do |val|
+    raise "#{desc.capitalize} can't be greater than #{max}" if val > max
+    raise "#{desc.capitalize} can't be less than #{min}" if val < min
+    puts "#{desc.capitalize} set to #{val}"
   end
 end
 
@@ -67,8 +79,9 @@ end
 
 y = ->(x) { 1 / (BigMath.sin(x, 100) + BigMath.cos(x, 100)) }
 xs = (0..8).map { |i| PI * (-1r / 4 + BigDecimal("0.1") * (i + 1)) }
-ys = xs.map { |x| y[x] }
-polynomial = LagrangePolynomial.new(xs, ys)
+xys = xs.map { |x| [x, y[x]] }
+order = get_int("polynomial order", min: 1, max: xys.count - 1)
+polynomial = LagrangePolynomial.new(xys, order)
 
 result =
   (0..16)
@@ -76,15 +89,13 @@ result =
     .map do |target_x|
     [
       target_x,
-      polynomial.derivative(1, target_x),
-      polynomial.derivative_error(1, target_x),
-      polynomial.derivative(2, target_x),
-      polynomial.derivative_error(2, target_x),
+      polynomial.derivative_with_error(1, target_x),
+      polynomial.derivative_with_error(2, target_x),
     ]
   end
 
 puts "Lagrange derivatives:"
-result.each do |x, d1, ed1, d2, ed2|
+result.each do |x, (d1, ed1), (d2, ed2)|
   puts ". x = #{inspect_number(x)}"
   puts "  dy/dx = #{inspect_number(d1)}  (error = #{inspect_error(ed1)})"
   puts "  d2y/dx2 = #{inspect_number(d2)}  (error = #{inspect_error(ed2)})"
