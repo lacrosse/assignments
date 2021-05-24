@@ -80,7 +80,7 @@ end
 y = ->(x) { 1 / (BigMath.sin(x, 100) + BigMath.cos(x, 100)) }
 xs = (0..8).map { |i| PI * (-1r / 4 + BigDecimal("0.1") * (i + 1)) }
 xys = xs.map { |x| [x, y[x]] }
-order = get_int("polynomial order", min: 1, max: xys.count - 1)
+order = get_int("polynomial order", min: 3, max: xys.count - 1)
 polynomial = LagrangePolynomial.new(xys, order)
 
 result =
