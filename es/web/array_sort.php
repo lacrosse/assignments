@@ -23,22 +23,37 @@ function merge_sort($arr) {
   }
 }
 
-echo("Введите строки поочередно, завершая ввод символом EOF:\n");
-
-$arr = array();
-
-while($str = fgets(STDIN)) {
-  $arr[] = $str;
-}
-
-echo("Выполняется сортировка массива слиянием...\n");
-
-$arr = merge_sort($arr);
-
-echo("Сортированный массив:\n");
-
-array_walk($arr, function($str) {
-  echo($str);
-});
-
 ?>
+
+<html>
+  <head>
+    <title>Сортировка массива строк</title>
+    <style>
+      textarea {
+        width: 500px;
+        height: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <?
+      if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+        $text = $_POST['text'];
+        $arr = explode("\n", $text);
+        echo '<h2>Результат сортировки массива слиянием:</h2>';
+        $arr = merge_sort($arr);
+        array_walk($arr, function($str) {
+          echo '<p>' . $str . '</p>';
+        });
+      } else {
+    ?>
+      <p>Введите строки в поле:</p>
+      <form action="" method="post">
+        <textarea name="text"></textarea><br>
+        <input type="submit" value="Сортировать">
+      </form>
+    <?
+      }
+    ?>
+  </body>
+</html>
