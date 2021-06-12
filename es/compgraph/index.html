@@ -16,7 +16,18 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/16.14.0/umd/react.production.min.js" integrity="sha512-2YCEuA9o4l9bZd4vpYo2iGMrg3fJ/2SHrPPnYwpXiIegB7i0eAroKyhlR20jxPXhlFXPYPzIyc0e2pTWv2eSpA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js" integrity="sha512-9jGNr5Piwe8nzLLYTk8QrEMPfjGU0px80GYzKZUxi7lmCfrBjtyCc1V5kkS5vxVwwIB7Qpzc7UxLiQxfAN30dw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.min.js"></script>
-  <script src="01.js"></script>
+  <script src="prims/cone.js"></script>
+  <script src="prims/cube.js"></script>
+  <script src="prims/cylinder.js"></script>
+  <script src="prims/dodecahedron.js"></script>
+  <script src="prims/icosahedron.js"></script>
+  <script src="prims/octahedron.js"></script>
+  <script src="prims/sierpinski.js"></script>
+  <script src="prims/sphere.js"></script>
+  <script src="prims/sponge.js"></script>
+  <script src="prims/tetrahedron.js"></script>
+  <script src="prims/torus.js"></script>
+  <script src="prims/triangular_pyramid.js"></script>
   <script type="text/babel">
     const CGMath = {
       multiplyMatrices(one, two) {
@@ -254,9 +265,10 @@
         return (
           <div>
             {this.state.valid &&
-              <MatrixDisplayer matrix={this.state.matrix} /> ||
-              <p>Размѣрности матрицъ не совпадаютъ. Сложеніе невозможно.</p>
-            }
+              <MatrixDisplayer matrix={this.state.matrix} /> || [
+              <p>Размѣрности матрицъ не совпадаютъ.</p>,
+              <p>Сложеніе невозможно.</p>
+            ]}
           </div>
         )
       }
@@ -287,9 +299,10 @@
         return (
           <div>
             {this.state.valid &&
-              <MatrixDisplayer matrix={this.state.matrix} /> ||
-              <p>Размѣрности матрицъ не совпадаютъ. Вычитаніе невозможно.</p>
-            }
+              <MatrixDisplayer matrix={this.state.matrix} /> || [
+                <p>Размѣрности матрицъ не совпадаютъ.</p>,
+                <p>Вычитаніе невозможно.</p>
+              ]}
           </div>
         )
       }
@@ -303,9 +316,10 @@
         return (
           <div>
             {this.state.valid &&
-              <MatrixDisplayer matrix={this.state.matrix} /> ||
-              <p>Ширина первой матрицы не совпадаетъ съ высотой второй матрицы. Умноженіе невозможно.</p>
-            }
+              <MatrixDisplayer matrix={this.state.matrix} /> || [
+              <p>Ширина первой матрицы не совпадаетъ съ высотой второй матрицы.</p>,
+              <p>Умноженіе невозможно.</p>
+            ]}
           </div>
         )
       }
@@ -737,173 +751,300 @@
         } else return shaderProgram
       }
 
-      componentDidMount() {
-        this.gl = this.canvas.getContext("webgl")
-
-        let initBuffers = () => {
-          const positionBuffer = this.gl.createBuffer()
-
-          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, positionBuffer)
-
-          const positions = [
-            -1.0,  1.0,
-            1.0,  1.0,
-            -1.0, -1.0,
-            1.0, -1.0,
-          ]
-
-          this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW)
-
-          return { position: positionBuffer, }
-        }
-
-        let drawScene = (programInfo, buffers) => {
-          this.gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
-          this.gl.clearDepth(1.0);                 // Clear everything
-          this.gl.enable(this.gl.DEPTH_TEST);           // Enable depth testing
-          this.gl.depthFunc(this.gl.LEQUAL);            // Near things obscure far things
-
-          // Clear the canvas before we start drawing on it.
-
-          this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-
-          // Create a perspective matrix, a special matrix that is
-          // used to simulate the distortion of perspective in a camera.
-          // Our field of view is 45 degrees, with a width/height
-          // ratio that matches the display size of the canvas
-          // and we only want to see objects between 0.1 units
-          // and 100 units away from the camera.
-
-          const fieldOfView = 45 * Math.PI / 180   // in radians
-          const aspect = this.gl.canvas.clientWidth / this.gl.canvas.clientHeight
-          const zNear = 0.1
-          const zFar = 100.0
-          const projectionMatrix = mat4.create()
-          mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar)
-
-          const modelViewMatrix = mat4.create()
-          mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -6.0])
-
-          // Tell WebGL how to pull out the positions from the position
-          // buffer into the vertexPosition attribute.
-          {
-            const numComponents = 2  // pull out 2 values per iteration
-            const type = this.gl.FLOAT    // the data in the buffer is 32bit floats
-            const normalize = false  // don't normalize
-            const stride = 0         // how many bytes to get from one set of values to the next
-                                      // 0 = use type and numComponents above
-            const offset = 0         // how many bytes inside the buffer to start from
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffers.position)
-            this.gl.vertexAttribPointer(
-              programInfo.attribLocations.vertexPosition,
-              numComponents,
-              type,
-              normalize,
-              stride,
-              offset
-            )
-            this.gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition)
-          }
-
-          this.gl.useProgram(programInfo.program);
-          this.gl.uniformMatrix4fv(
-            programInfo.uniformLocations.projectionMatrix,
-            false,
-            projectionMatrix
-          );
-          this.gl.uniformMatrix4fv(
-            programInfo.uniformLocations.modelViewMatrix,
-            false,
-            modelViewMatrix
-          );
-
-          {
-            const offset = 0;
-            const vertexCount = 4;
-            this.gl.drawArrays(this.gl.TRIANGLE_STRIP, offset, vertexCount);
-          }
-        }
-
-        let main = () => {
-          // gl.clearColor(0.0, 0.0, 0.0, 1.0)
-          // gl.clear(gl.COLOR_BUFFER_BIT)
-
-          const vsSource = `
-            attribute vec4 aVertexPosition;
-
-            uniform mat4 uModelViewMatrix;
-            uniform mat4 uProjectionMatrix;
-
-            void main() {
-              gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-            }
-          `;
-
-          const fsSource = `
-            void main() {
-              gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-            }
-          `;
-
-          const shaderProgram = this.initShaderProgram([
-            [this.gl.VERTEX_SHADER, vsSource],
-            [this.gl.FRAGMENT_SHADER, fsSource]
-          ])
-
-          const programInfo = {
-            program: shaderProgram,
-            attribLocations: {
-              vertexPosition: this.gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
-            },
-            uniformLocations: {
-              projectionMatrix: this.gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-              modelViewMatrix: this.gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
-            },
-          }
-
-          const buffers = initBuffers(this.gl)
-
-          drawScene(programInfo, buffers)
-        }
-
-        main()
+      createBuffer = (type, value) => {
+        const buffer = this.gl.createBuffer()
+        this.gl.bindBuffer(type, buffer)
+        this.gl.bufferData(type, value, this.gl.STATIC_DRAW)
+        return buffer
       }
-      onRef = (ref) => { this.canvas = ref }
-      render() { return <canvas ref={this.onRef} id="glCanvas" width={this.props.width} height={this.props.height}></canvas> }
-    }
-    class Assignment4 extends React.Component {
+
+      initBuffers = (positions, colors, indices, normals) => {
+        const vertex = this.createBuffer(this.gl.ARRAY_BUFFER, new Float32Array(positions))
+        const color = this.createBuffer(this.gl.ARRAY_BUFFER, new Float32Array(colors))
+        const indexBuffer = this.createBuffer(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices))
+        const normal = this.createBuffer(this.gl.ARRAY_BUFFER, new Float32Array(normals))
+
+        return { vertex, normal, color, indices: indexBuffer }
+      }
+
+      drawScene = (programInfo, buffers, vertexCount, deltaTime) => {
+        if (this.gl.isContextLost()) return
+        this.gl.clearColor(0.0, 0.0, 0.0, 1.0)
+        this.gl.clearDepth(1.0)
+        this.gl.enable(this.gl.DEPTH_TEST)
+        this.gl.depthFunc(this.gl.LEQUAL)
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT)
+
+        const fieldOfView = 45 * Math.PI / 180
+        const aspect = this.canvas.clientWidth / this.canvas.clientHeight
+        const zNear = 0.1
+        const zFar = 100.0
+        const projectionMatrix = mat4.create()
+        mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar)
+
+        const modelViewMatrix = mat4.create()
+        mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -6.0])
+        mat4.rotate(modelViewMatrix, modelViewMatrix, this.state.shapeRotation * 0.1, [1, 0, 0])
+        mat4.rotate(modelViewMatrix, modelViewMatrix, this.state.shapeRotation, [0, 1, 0])
+        mat4.rotate(modelViewMatrix, modelViewMatrix, this.state.shapeRotation * 0.2, [0, 0, 1])
+
+        const normalMatrix = mat4.create()
+        mat4.invert(normalMatrix, modelViewMatrix)
+        mat4.transpose(normalMatrix, normalMatrix)
+        // mat4.rotate(normalMatrix, normalMatrix, this.state.shapeRotation * 0, [0, 1, 0])
+
+        {
+          const numComponents = 3
+          const type = this.gl.FLOAT
+          const normalize = false
+          const stride = 0
+          const offset = 0
+          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffers.vertex)
+          this.gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexPosition,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset
+          )
+          this.gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition)
+        }
+
+        {
+          const numComponents = 4
+          const type = this.gl.FLOAT
+          const normalize = false
+          const stride = 0
+          const offset = 0
+          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffers.color)
+          this.gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexColor,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset
+          )
+          this.gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor)
+        }
+
+        {
+          const numComponents = 3;
+          const type = this.gl.FLOAT;
+          const normalize = false;
+          const stride = 0;
+          const offset = 0;
+          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffers.normal);
+          this.gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexNormal,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset
+          )
+          this.gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal)
+        }
+
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, buffers.indices)
+
+        this.gl.useProgram(programInfo.program)
+        this.gl.uniformMatrix4fv(
+          programInfo.uniformLocations.projectionMatrix,
+          false,
+          projectionMatrix
+        )
+        this.gl.uniformMatrix4fv(
+          programInfo.uniformLocations.modelViewMatrix,
+          false,
+          modelViewMatrix
+        )
+        this.gl.uniformMatrix4fv(
+          programInfo.uniformLocations.normalMatrix,
+          false,
+          normalMatrix
+        )
+
+        {
+          const type = this.gl.UNSIGNED_SHORT
+          const offset = 0
+          this.gl.drawElements(this.gl.TRIANGLES, vertexCount, type, offset)
+        }
+
+        this.setState({ shapeRotation: this.state.shapeRotation + deltaTime })
+      }
+
       constructor(props) {
         super(props)
         this.state = {
-          selectedShape: "cone",
-          selectedStyle: "wire"
+          shapeRotation: 0.0
         }
       }
 
-      redrawWith = state => { this.setState(state, () => this.drawScene()) }
-      onShapeChange = ({ target: { value } }) => this.redrawWith({ selectedShape: value })
-      onStyleChange = ({ target: { value } }) => this.redrawWith({ selectedStyle: value })
+      componentDidMount() {
+        this.gl = this.canvas.getContext("webgl")
+
+        const vertexShaderSource = `
+          attribute vec4 aVertexPosition;
+          attribute vec3 aVertexNormal;
+          attribute vec4 aVertexColor;
+
+          uniform mat4 uNormalMatrix;
+          uniform mat4 uModelViewMatrix;
+          uniform mat4 uProjectionMatrix;
+
+          varying lowp vec4 vColor;
+          varying highp vec3 vLighting;
+
+          void main(void) {
+            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+            vColor = aVertexColor;
+
+            highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+            highp vec3 directionalLightColor = vec3(1, 1, 1);
+            highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
+
+            highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+
+            highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+            vLighting = ambientLight + (directionalLightColor * directional);
+          }
+        `;
+
+        const fragmentShaderSource = `
+          varying lowp vec4 vColor;
+          varying highp vec3 vLighting;
+
+          void main() {
+            gl_FragColor = vec4(vColor.rgb * vLighting, vColor.a);
+          }
+        `;
+
+        const shaderProgram = this.initShaderProgram([
+          [this.gl.VERTEX_SHADER, vertexShaderSource],
+          [this.gl.FRAGMENT_SHADER, fragmentShaderSource]
+        ])
+
+        const programInfo = {
+          program: shaderProgram,
+          attribLocations: {
+            vertexPosition: this.gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            vertexNormal: this.gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
+            vertexColor: this.gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+          },
+          uniformLocations: {
+            projectionMatrix: this.gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+            modelViewMatrix: this.gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            normalMatrix: this.gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
+          },
+        }
+
+        const shapeFunction = {
+          cone: Cone,
+          cube: Cube,
+          cylinder: Cylinder,
+          dodecahedron: Dodecahedron,
+          icosahedron: Icosahedron,
+          octahedron: Octahedron,
+          sierpinski: Sierpinski,
+          sphere: Sphere,
+          sponge: Sponge,
+          tetrahedron: Tetrahedron,
+          torus: Torus,
+        }[this.props.shape]
+        const shape = shapeFunction()
+        const positions = shape.vertices
+        const indices = shape.indices
+        const normals = shape.normals
+        // const randomColor = () => [Math.random(), Math.random(), Math.random(), 1.0]
+        // const faceColors = Array.from(new Array(6), randomColor)
+        // const colors = faceColors.flatMap(val => new Array(4).fill(val).flatMap(v => v))
+        const colors = Array.from(new Array(positions.length), () => this.props.color).flatMap(v => v)
+        console.log(colors);
+
+        const buffers = this.initBuffers(positions, colors, indices, normals)
+
+        let time = 0
+        let render = now => {
+          now *= 0.001
+          const deltaTime = now - time
+          time = now
+          this.drawScene(programInfo, buffers, indices.length, deltaTime)
+          requestAnimationFrame(render)
+        }
+        requestAnimationFrame(render)
+      }
+
+      componentWillUnmount() {
+        const loseContextExt = this.gl.getExtension("WEBGL_lose_context")
+        if (loseContextExt) {
+          console.log("losing GL context...")
+          loseContextExt.loseContext()
+        }
+      }
+
+      onRef = (ref) => { this.canvas = ref }
+      render() { return <canvas ref={this.onRef} width={this.props.width} height={this.props.height}></canvas> }
+    }
+    class Assignment4 extends React.Component {
+      canvas = null
+
+      constructor(props) {
+        super(props)
+        this.state = {
+          selectedShape: "cube",
+          selectedStyle: "solid",
+          selectedColor: [255, 50, 127]
+        }
+      }
+
+      onShapeChange = ({ target: { value } }) => this.setState({ selectedShape: value })
+      onStyleChange = ({ target: { value } }) => this.setState({ selectedStyle: value })
+      onColorChange = ({ target }) => {
+        let match = target.name.match(/^color\[(\d+)\]$/)
+        let index = parseInt(match[1])
+        let newColor = [...this.state.selectedColor]
+        newColor[index] = target.value
+        this.setState({ selectedColor: newColor })
+      }
+
+      onRef = ref => this.canvas = ref
 
       render() {
-        const shapes = ["cone", "cube", "cylinder", "dodecahedron", "icosahedron", "octahedron", "rhombic_dodecahedron", "sierpinski_sponge", "sphere", "teapot", "tetrahedron", "torus"]
+        const shapes = ["cone", "cube", "cylinder", "dodecahedron", "icosahedron", "octahedron", "sierpinski", "sphere", "sponge", "tetrahedron", "torus"]
         const styles = [["wire", "Каркасъ"], ["solid", "Заливка цвѣтомъ"]]
-        let shapeSelector = shapes.map(shape =>
-          <div class="form-check">
-            <label><input type="radio" value={shape} onChange={this.onShapeChange} checked={this.state.selectedShape === shape} /> {shape}</label>
-          </div>
-        )
+        let shapeSelector = shapes.map(shape => {
+          let text = shape.charAt(0).toUpperCase() + shape.slice(1)
+          return (
+            <div class="form-check">
+              <label><input type="radio" value={shape} onChange={this.onShapeChange} checked={this.state.selectedShape === shape} /> {text}</label>
+            </div>
+          )
+        })
         let styleSelector = styles.map(([style, text]) =>
           <div class="form-check">
             <label><input type="radio" value={style} onChange={this.onStyleChange} checked={this.state.selectedStyle === style} /> {text}</label>
           </div>
         )
+        let colorSelector = [0, 1, 2].map(comp =>
+          <div class="form-check"><input type="range" name={`color[${comp}]`} value={this.state.selectedColor[comp]} onChange={this.onColorChange} min="0" max="255" step="1" /></div>
+        )
+        let normalizedColor = [...this.state.selectedColor.map(v => v / 255), 1]
         return (
           <div>
             <h1>Лабораторная работа №4</h1>
             <p style={{fontStyle: "italic"}}>Введеніе въ OpenGL (WebGL)</p>
             <div style={{display: "flex"}}>
               <div>
-                <WebGLCanvas width={500} height={400} />
+                <WebGLCanvas
+                  ref={this.onRef}
+                  key={this.state.selectedShape + this.state.selectedStyle + this.state.selectedColor.join(";")}
+                  shape={this.state.selectedShape}
+                  style={this.state.selectedStyle}
+                  color={normalizedColor}
+                  width={500}
+                  height={400} />
               </div>
               <div style={{marginLeft: "10px"}}>
                 <p>Форма
@@ -911,6 +1052,9 @@
                 </p>
                 <p>Типъ отрисовки
                   {styleSelector}
+                </p>
+                <p>Цвѣтъ фигуры (RGB)
+                  {colorSelector}
                 </p>
               </div>
             </div>
