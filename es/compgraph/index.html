@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Лабораторныя работы</title>
+  <link rel="stylesheet" href="application.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
+          integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ=="
+          crossorigin="anonymous" defer>
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/16.14.0/umd/react.production.min.js" integrity="sha512-2YCEuA9o4l9bZd4vpYo2iGMrg3fJ/2SHrPPnYwpXiIegB7i0eAroKyhlR20jxPXhlFXPYPzIyc0e2pTWv2eSpA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js" integrity="sha512-9jGNr5Piwe8nzLLYTk8QrEMPfjGU0px80GYzKZUxi7lmCfrBjtyCc1V5kkS5vxVwwIB7Qpzc7UxLiQxfAN30dw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.min.js"></script>
+  <script src="01.js"></script>
+  <script type="text/babel">
+    const CGMath = {
+      multiplyMatrices(one, two) {
+        const oneHeight = one.length
+        const twoHeight = two.length
+        const oneWidth = (one[0] || []).length
+        const twoWidth = (two[0] || []).length
+
+        if (oneWidth != twoHeight) {
+          return { valid: false }
+        } else {
+          let matrix = [...new Array(oneHeight)].map((_, y) =>
+            [...new Array(twoWidth)].map((_, x) => one[y].map((o, i) => o * two[i][x]).reduce((a, b) => a + b) )
+          )
+
+          return { valid: true, matrix: matrix }
+        }
+      },
+      multiplyVectorScalar(vector, scalar) {
+        return vector.map(n => n * scalar)
+      },
+      toHomogeneous(polygon) {
+        return polygon.map(coords => [...coords, 1])
+      },
+      radius(polygon) {
+        return Math.max(...polygon.map(coords => Math.hypot(...coords)))
+      },
+      eyeVector(n, i) {
+        return [...new Array(i).fill(0), 1, ...new Array(n - i - 1).fill(0)]
+      },
+      translationMatrix(ds) {
+        let n = ds.length + 1
+        return Array.from(new Array(n), (_, i) => {
+          if (i < n - 1) return this.eyeVector(n, i)
+          else return [...ds, 1]
+        })
+      },
+      scalingMatrix(factors) {
+        let n = 3 + 1
+        return Array.from(new Array(n), (_, i) => {
+          let eyeVector = this.eyeVector(n, i)
+          if (i < n - 1) return this.multiplyVectorScalar(eyeVector, factors[i])
+          else return eyeVector
+        })
+      },
+      rotatingMatrix(phi, ns) {
+        let [n1, n2, n3] = ns
+        let rad = Math.PI * phi / 180
+        let cos = Math.cos(rad)
+        let sin = Math.sin(rad)
+        return [
+          [n1 ** 2 + (1 - n1 ** 2) * cos, n1 * n2 * (1 - cos) + n3 * sin, n1 * n3 * (1 - cos) - n2 * sin, 0],
+          [n1 * n2 * (1 - cos) - n3 * sin, n2 ** 2 + (1 - n2 ** 2) * cos, n2 * n3 * (1 - cos) + n1 * sin, 0],
+          [n1 * n3 * (1 - cos) + n2 * sin, n2 * n3 * (1 - cos) - n1 * sin, n3 ** 2 + (1 - n3 ** 2) * cos, 0],
+          [0, 0, 0, 1]
+        ]
+      },
+      flippingMatrix(spec) {
+        let n = 4
+        return Array.from(new Array(n), (_, i) => {
+          let eyeVector = this.eyeVector(n, i)
+          if (i < n - 1) return this.multiplyVectorScalar(eyeVector, Math.pow(-1, spec[i]))
+          else return eyeVector
+        })
+      },
+      translate(polygon, ds) {
+        return this.multiplyMatrices(polygon, this.translationMatrix(ds)).matrix
+      },
+      scale(polygon, factors) {
+        return this.multiplyMatrices(polygon, this.scalingMatrix(factors)).matrix
+      },
+      rotate(polygon, phi, ns) {
+        return this.multiplyMatrices(polygon, this.rotatingMatrix(phi, ns)).matrix
+      },
+      flip(polygon, spec) {
+        return this.multiplyMatrices(polygon, this.flippingMatrix(spec)).matrix
+      },
+      toScreen(polygon) {
+        return polygon.map(coords => {
+          let h = coords.slice(-1)[0]
+          return coords.slice(0, 2).map(x => x * h)
+        })
+      }
+    }
+    class TaskContainer extends React.Component {
+      render () {
+        return (
+          <div className="task-container" style={this.props.style}>
+            {this.props.children}
+          </div>
+        )
+      }
+    }
+    class HelloButton extends React.Component {
+      greet() {
+        alert("Привѣтъ!")
+      }
+      render() {
+        return (
+          <button onClick={this.greet}>
+            Попривѣтствовать
+          </button>
+        )
+      }
+    }
+    class Form12 extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = {
+          bgColor: "white"
+        }
+      }
+      changeColor = () => {
+        let newColor = "#" + ((1<<24)*Math.random() | 0).toString(16)
+        console.log("changing color to " + newColor);
+        this.setState({
+          bgColor: newColor
+        })
+      }
+      render() {
+        return (
+          <div style={{ display: "inline-block", backgroundColor: this.state.bgColor, width: 200, height: 150, padding: "1em" }}>
+            <button onClick={this.changeColor}>
+              Перекрасить
+            </button>
+          </div>
+        )
+      }
+    }
+    class MatrixForm extends React.Component {
+      dimsUpdate = (x, y) => {
+        let rowSliceLength = this.props.matrix.length + y
+        let rowSlice = this.props.matrix.slice(0, rowSliceLength)
+        let resizedRowSlice = rowSlice.map(row => {
+          let sliceLength = row.length + x
+          let padLength = Math.max(x, 0)
+          let pad = new Array(padLength).fill(0)
+          return [...row.slice(0, sliceLength), ...pad]
+        })
+        let rowLength = (resizedRowSlice[0] || []).length
+        let rowPadLength = Math.max(y, 0)
+        let rowPad = new Array(rowPadLength).fill(0).map(() => new Array(rowLength).fill(0))
+        let matrix = [...resizedRowSlice, ...rowPad]
+        this.props.onMatrixUpdate(matrix)
+      }
+      randomize = () => {
+        let matrix = this.props.matrix.map(row => row.map(() => Math.round(Math.random() * 18 - 9)))
+        this.props.onMatrixUpdate(matrix)
+      }
+      handleInputChange = ({ target: target }) => {
+        const value = parseInt(target.value)
+        let match = target.name.match(/^matrix\[(\d+)\]\[(\d+)\]$/)
+        let target_x = parseInt(match[1])
+        let target_y = parseInt(match[2])
+
+        let newMatrix = this.props.matrix.map((row, y) => {
+          if (y == target_y)
+            return row.map((v, x) => {
+              if (x == target_x) return value
+              else return v
+            })
+          else return row
+        })
+        this.props.onMatrixUpdate(newMatrix)
+        console.log([target_x, target_y, value, newMatrix])
+      }
+      render() {
+        let matrix = this.props.matrix.map((row, y) =>{
+          let cells = row.map((elem, x) =>
+            <td>
+              <input name={"matrix[" + x + "][" + y + "]"} style={{ width: "3em" }} value={this.props.matrix[y][x]} onChange={this.handleInputChange} />
+            </td>
+          )
+          return <tr>{cells}</tr>
+        })
+        return (
+          <div style={{ display: "inline-block", border: "1px solid black", padding: "10px", margin: "3px" }}>
+            <div>
+              Столбцы:
+              <button onClick={() => this.dimsUpdate(1, 0)}>+</button>
+              <button onClick={() => this.dimsUpdate(-1, 0)}>-</button>
+            </div>
+            <div>
+              Строки:
+              <button onClick={() => this.dimsUpdate(0, 1)}>+</button>
+              <button onClick={() => this.dimsUpdate(0, -1)}>-</button>
+            </div>
+            <div>
+              <button onClick={this.randomize}>Зашумить</button>
+            </div>
+            <table>
+              {matrix}
+            </table>
+          </div>
+        );
+      }
+    }
+    class MatrixDisplayer extends React.Component {
+      render() {
+        let rows = this.props.matrix.map(row => {
+          return <tr>{row.map(n => <td style={{ padding: "3px" }}>{n}</td>)}</tr>
+        })
+        return (
+          <div key={this.props.matrix.length} style={{ display: "inline-block", border: "1px solid black", padding: "10px", margin: "3px" }}>
+            <table>
+              {rows}
+            </table>
+          </div>
+        )
+      }
+    }
+    class MatrixSum extends React.Component {
+      constructor(props) {
+        super(props)
+
+        const oneHeight = props.one.length
+        const twoHeight = props.two.length
+        const oneWidth = (props.one[0] || []).length
+        const twoWidth = (props.two[0] || []).length
+
+        if (oneHeight != twoHeight || oneWidth != twoWidth) {
+          this.state = {
+            valid: false
+          }
+        } else {
+          let matrix = props.one.map((oneRow, y) => oneRow.map((oneN, x) => oneN + props.two[y][x]))
+
+          this.state = {
+            valid: true,
+            matrix: matrix
+          }
+        }
+      }
+      render() {
+        return (
+          <div>
+            {this.state.valid &&
+              <MatrixDisplayer matrix={this.state.matrix} /> ||
+              <p>Размѣрности матрицъ не совпадаютъ. Сложеніе невозможно.</p>
+            }
+          </div>
+        )
+      }
+    }
+    class MatrixDifference extends React.Component {
+      constructor(props) {
+        super(props)
+
+        const oneHeight = props.one.length
+        const twoHeight = props.two.length
+        const oneWidth = (props.one[0] || []).length
+        const twoWidth = (props.two[0] || []).length
+
+        if (oneHeight != twoHeight || oneWidth != twoWidth) {
+          this.state = {
+            valid: false
+          }
+        } else {
+          let matrix = props.one.map((oneRow, y) => oneRow.map((oneN, x) => oneN - props.two[y][x]))
+
+          this.state = {
+            valid: true,
+            matrix: matrix
+          }
+        }
+      }
+      render() {
+        return (
+          <div>
+            {this.state.valid &&
+              <MatrixDisplayer matrix={this.state.matrix} /> ||
+              <p>Размѣрности матрицъ не совпадаютъ. Вычитаніе невозможно.</p>
+            }
+          </div>
+        )
+      }
+    }
+    class MatrixProduct extends React.Component {
+      constructor(props) {
+        super(props)
+        this.state = CGMath.multiplyMatrices(props.one, props.two)
+      }
+      render() {
+        return (
+          <div>
+            {this.state.valid &&
+              <MatrixDisplayer matrix={this.state.matrix} /> ||
+              <p>Ширина первой матрицы не совпадаетъ съ высотой второй матрицы. Умноженіе невозможно.</p>
+            }
+          </div>
+        )
+      }
+    }
+    class MatrixTask extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = {
+          one: [[1]], oneKey: Math.random(),
+          two: [[1]], twoKey: Math.random()
+        }
+      }
+      updateMatrix(i, matrix) {
+        if (i == 0) this.setState({ one: matrix, oneKey: Math.random() })
+        else this.setState({ two: matrix, twoKey: Math.random() })
+        console.log(this.state);
+      }
+      render() {
+        return (
+          <div>
+            <div>
+              <h3>Исходныя матрицы</h3>
+              <MatrixForm key={this.state.oneKey} matrix={this.state.one} onMatrixUpdate={m => this.updateMatrix(0, m)} />
+              <MatrixForm key={this.state.twoKey} matrix={this.state.two} onMatrixUpdate={m => this.updateMatrix(1, m)} />
+            </div>
+            <div style={{display: "flex"}} class="flex">
+              <div>
+                <h3>Сложеніе</h3>
+                <MatrixSum key={this.state.oneKey + this.state.twoKey} one={this.state.one} two={this.state.two} />
+              </div>
+              <div>
+                <h3>Вычитаніе</h3>
+                <MatrixDifference key={this.state.oneKey + this.state.twoKey} one={this.state.one} two={this.state.two} />
+              </div>
+              <div>
+                <h3>Умноженіе</h3>
+                <MatrixProduct key={this.state.oneKey + this.state.twoKey} one={this.state.one} two={this.state.two} />
+              </div>
+            </div>
+          </div>
+        )
+      }
+    }
+    class Assignment1 extends React.Component {
+      render() {
+        return (
+          <div>
+            <h1>Лабораторная работа №1</h1>
+            <p style={{fontStyle: "italic"}}>Первый графическій проектъ. Матричныя операціи</p>
+            <h2>https://metanit.com/sharp/windowsforms/1.1.php</h2>
+            <h3>Глава 1</h3>
+            <TaskContainer>
+              <HelloButton />
+            </TaskContainer>
+            <h3>Глава 2</h3>
+            <TaskContainer>
+              <Form12 />
+            </TaskContainer>
+            <h2>Матрицы</h2>
+            <TaskContainer>
+              <MatrixTask />
+            </TaskContainer>
+          </div>
+        )
+      }
+    }
+    class Canvas extends React.Component {
+      ctx = null
+
+      static defaultProps = {
+        scale: 1
+      }
+
+      erase = () => {
+        this.ctx.clearRect(0, 0, this.props.width, this.props.height)
+      }
+
+      drawPolypath = (polypath, color, size, lineDash, factors, rotationSpec, flipSpec, cursor, cameraSpec) => {
+        let halfCanvasWidth = this.props.width / 2
+        let halfCanvasHeight = this.props.height / 2
+        polypath.forEach(worldPath => {
+          // Scale relative to world origin
+          let path = CGMath.toHomogeneous(worldPath)
+          let scaledFactors = factors.map(f => this.props.scale * f)
+          path = CGMath.scale(path, scaledFactors)
+
+          // Translate to cursor
+          path = CGMath.translate(path, cursor)
+
+          // Rotate around an arbitrary axis
+          let [phi, ns, axisCursor] = rotationSpec
+          let negAxisCursor = CGMath.multiplyVectorScalar(axisCursor, -1)
+          path = CGMath.translate(path, negAxisCursor)
+          path = CGMath.rotate(path, phi, ns)
+          path = CGMath.translate(path, axisCursor)
+
+          // Apply flip
+          path = CGMath.flip(path, flipSpec)
+
+          // Set up the camera
+          let [azimuth, tilt] = cameraSpec
+          path = CGMath.rotate(path, azimuth, [0, 1, 0])
+          path = CGMath.rotate(path, tilt, [1, 0, 0])
+
+          // Translate relative to canvas center
+          path = CGMath.translate(path, [halfCanvasWidth, halfCanvasHeight, 0])
+
+          // Draw
+          let [head, ...tail] = CGMath.toScreen(path)
+          this.ctx.strokeStyle = color
+          this.ctx.lineWidth = size
+          this.ctx.lineCap = "round"
+          this.ctx.setLineDash(lineDash)
+          this.ctx.beginPath()
+          this.ctx.moveTo(...head)
+          tail.forEach(screenCoords => this.ctx.lineTo(...screenCoords))
+          this.ctx.closePath()
+          this.ctx.stroke()
+        })
+      }
+      onRef = ref => {
+        this.ctx = ref.getContext('2d')
+      }
+      render() {
+        return <canvas ref={this.onRef} width={this.props.width} height={this.props.height}></canvas>
+      }
+    }
+    class CanvasController extends React.Component {
+      canvas = null
+      axes = [
+        [[-100, 0, 0], [100, 0, 0]],
+        [[0, -100, 0], [0, 100, 0]],
+        [[0, 0, -100], [0, 0, 100]]
+      ]
+
+      static defaultProps = {
+        mode: "2d",
+        camera: [0, 0],
+        rotationAxis: [0, 0, 1],
+        frameDuration: 50
+      }
+
+      constructor(props) {
+        super(props);
+        this.state = {
+          lazyPainter: null,
+          cursor: [0, 0, 0],
+          cameraSpec: props.camera,
+          rotationSpec: [0, props.rotationAxis, [0, 0, 0]],
+          scale: [0.5, 0.5, 0.5],
+          flipSpec: [0, 0, 0],
+          brushColor: "#000",
+          dash: [],
+          axesShown: false,
+          figureShown: false,
+        }
+      }
+
+      //
+      // Scene setup and manipulation
+      //
+
+      drawAxes = () => {
+        let [phi, ns, offset] = this.state.rotationSpec
+        let rotationAxisPath = [
+          CGMath.multiplyVectorScalar(ns, -1),
+          ns
+        ]
+        let rotationAxisCursor = offset
+        this.canvas.drawPolypath([rotationAxisPath], "#FF851B", 1, [], [100, 100, 100], [0, [0, 0, 1], [0, 0, 0]], [0, 0, 0], rotationAxisCursor, this.state.cameraSpec)
+        this.canvas.drawPolypath(this.axes, "#0074d9", 0.5, [], [10, 10, 10], [0, [0, 0, 1], [0, 0, 0]], [0, 0, 0], [0, 0, 0], this.state.cameraSpec)
+      }
+
+      drawFigure = () => {
+        this.canvas.drawPolypath(this.props.figure, this.state.brushColor, 1, this.state.dash, this.state.scale, this.state.rotationSpec, this.state.flipSpec, this.state.cursor, this.state.cameraSpec)
+      }
+
+      drawScene = () => {
+        this.canvas.erase()
+
+        if (this.state.axesShown) this.drawAxes()
+        if (this.state.figureShown) this.drawFigure()
+
+        console.log(this.state);
+      }
+
+      //
+      // State manipulation
+      //
+
+      redrawWith = state => this.setState(state, () => this.drawScene())
+      showAxes = () => this.redrawWith({ axesShown: true })
+      showFigure = () => this.redrawWith({ figureShown: true })
+      shift = ds => this.redrawWith({ cursor: this.state.cursor.map((val, i) => val + ds[i]) })
+      rotate = dphi => {
+        let [phi, ns, offset] = this.state.rotationSpec
+        this.redrawWith({ rotationSpec: [phi + dphi, ns, offset] })
+      }
+      scale = factors => this.redrawWith({ scale: this.state.scale.map((val, i) => val * factors[i]) })
+      flip = spec => this.redrawWith({ flipSpec: this.state.flipSpec.map((val, i) => val ^ spec[i]) })
+      changeColor = color => this.redrawWith({ brushColor: color })
+      setDash = dash => this.redrawWith({ dash: dash })
+      shiftRotationAxis = ds => {
+        let [phi, ns, offset] = this.state.rotationSpec
+        this.redrawWith({ rotationSpec: [phi, ns, offset.map((val, i) => val + ds[i])] })
+      }
+
+      //
+      // Animation
+      //
+
+      startAnimation = nextFrame => {
+        let frameDuration = this.props.frameDuration
+        this.stopAnimation()
+        this.showFigure()
+        let interval = setInterval(nextFrame, frameDuration)
+        this.setState({ lazyPainter: interval })
+      }
+      startDrift = ds => this.startAnimation(() => this.shift(ds))
+      startRotation = dphi => this.startAnimation(() => this.rotate(dphi))
+      stopAnimation = () => {
+        if (this.state.lazyPainter) {
+          clearInterval(this.state.lazyPainter)
+          this.setState({ lazyPainter: null })
+        }
+      }
+
+      resetCanvas = () => {
+        this.stopAnimation()
+        this.setState({ axesShown: false, figureShown: false })
+        this.canvas.erase()
+      }
+
+      onRef = ref => { this.canvas = ref }
+      render() {
+        let flipButtons = [[[1, 0, 0], "OYZ"], [[0, 1, 0], "OXZ"]].map(([spec, text]) =>
+          <button onClick={() => this.flip(spec)}>{text}</button>
+        )
+        let colorButtons = ["#001f3f", "#0074d9", "#B10DC9", "#85144b", "#3D9970"].map(color =>
+          <button onClick={() => this.changeColor(color)} style={{backgroundColor: color}}>🖌</button>
+        )
+        let min = Math.min(this.props.width, this.props.height)
+        let radius = Math.max(...this.props.figure.map(CGMath.radius))
+        let canvasScale = min / 2 / radius
+        return (
+          <div style={{display: "flex"}}>
+            <div>
+              <Canvas ref={this.onRef} width={this.props.width} height={this.props.height} scale={canvasScale} />
+            </div>
+            <div style={{marginLeft: "40px"}}>
+              <p>{this.state.cursor.join("; ")}</p>
+              <button onClick={this.showAxes}>Нарисовать оси</button><br/>
+              <button onClick={this.showFigure}>Нарисовать фигуру</button><br/>
+              <button onClick={this.resetCanvas}>Очистить</button><br/>
+              <p>
+                OX:
+                <button onClick={() => this.startDrift([-1, 0, 0])}>←</button>
+                <button onClick={() => this.startDrift([1, 0, 0])}>→</button>
+              </p>
+              <p>
+                OY
+                <button onClick={() => this.startDrift([0, -1, 0])}>↑</button>
+                <button onClick={() => this.startDrift([0, 1, 0])}>↓</button>
+              </p>
+              {this.props.mode == "3d" && <p>
+                OZ
+                <button onClick={() => this.startDrift([0, 0, -1])}>↙︎</button>
+                <button onClick={() => this.startDrift([0, 0, 1])}>↗︎</button>
+              </p>}
+              <p>
+                OXY
+                <button onClick={() => this.startDrift([-1, -1, 0])}>↖︎</button>
+                <button onClick={() => this.startDrift([1, 1, 0])}>↘︎</button>
+              </p>
+              {this.props.mode == "3d" && <p>
+                OXZ
+                <button onClick={() => this.startDrift([-1, 0, -1])}>↙︎</button>
+                <button onClick={() => this.startDrift([1, 0, 1])}>↗︎</button>
+              </p>}
+              {this.props.mode == "3d" && <p>
+                OYZ
+                <button onClick={() => this.startDrift([0, -1, -1])}>↖︎</button>
+                <button onClick={() => this.startDrift([0, 1, 1])}>↘︎</button>
+              </p>}
+              {this.props.mode == "3d" && <p>
+                XYZ
+                <button onClick={() => this.startDrift([-1, -1, -1])}>↖︎</button>
+                <button onClick={() => this.startDrift([1, 1, 1])}>↘︎</button>
+              </p>}
+            </div>
+            <div style={{marginLeft: "40px"}}>
+              <p>Отраженіе</p>
+              <button onClick={() => this.flip([1, 0, 0])}>OYZ</button>
+              <button onClick={() => this.flip([0, 1, 0])}>OXZ</button>
+              {this.props.mode == "3d" && <button onClick={() => this.flip([0, 0, 1])}>OXY</button>}
+              <p>Масштабированіе</p>
+              <p>
+                OX
+                <button onClick={() => this.scale([0.95, 1, 1])}>–</button>
+                <button onClick={() => this.scale([1.05, 1, 1])}>+</button>
+              </p>
+              <p>
+                OY
+                <button onClick={() => this.scale([1, 0.95, 1])}>–</button>
+                <button onClick={() => this.scale([1, 1.05, 1])}>+</button>
+              </p>
+              {this.props.mode == "3d" && <p>
+                OZ
+                <button onClick={() => this.scale([1, 1, 0.95])}>–</button>
+                <button onClick={() => this.scale([1, 1, 1.05])}>+</button>
+              </p>}
+              <p>
+                OXY
+                <button onClick={() => this.scale([0.95, 0.95, 1])}>–</button>
+                <button onClick={() => this.scale([1.05, 1.05, 1])}>+</button>
+              </p>
+              {this.props.mode == "3d" && <p>
+                OXZ
+                <button onClick={() => this.scale([0.95, 1, 0.95])}>–</button>
+                <button onClick={() => this.scale([1.05, 1, 1.05])}>+</button>
+              </p>}
+              {this.props.mode == "3d" && <p>
+                OYZ
+                <button onClick={() => this.scale([1, 0.95, 0.95])}>–</button>
+                <button onClick={() => this.scale([1, 1.05, 1.05])}>+</button>
+              </p>}
+              {this.props.mode == "3d" && <p>
+                XYZ
+                <button onClick={() => this.scale([0.95, 0.95, 0.95])}>–</button>
+                <button onClick={() => this.scale([1.05, 1.05, 1.05])}>+</button>
+              </p>}
+            </div>
+            <div style={{marginLeft: "40px"}}>
+              <p>Вращеніе</p>
+              <button onClick={() => this.startRotation(1)}>⟳</button>
+              <button onClick={() => this.startRotation(-1)}>⟲</button>
+              <p>
+                OX:
+                <button onClick={() => this.shiftRotationAxis([-1, 0, 0])}>←</button>
+                <button onClick={() => this.shiftRotationAxis([1, 0, 0])}>→</button>
+              </p>
+              {this.props.mode == "3d" && <p>
+                OZ
+                <button onClick={() => this.shiftRotationAxis([0, 0, 1])}>↑</button>
+                <button onClick={() => this.shiftRotationAxis([0, 0, -1])}>↓</button>
+              </p>}
+              <p>Цвѣтъ фигуры</p>
+              {colorButtons}
+              <p>Стиль линіи</p>
+              <button onClick={() => this.setDash([])}>━</button>
+              <button onClick={() => this.setDash([5, 5])}>┅</button>
+            </div>
+            <div key={this.state.lazyPainter} style={{marginLeft: "40px"}}>
+              {this.state.lazyPainter &&
+                (<div><p>Остановка</p><button onClick={this.stopAnimation}>✋</button></div>)
+              }
+            </div>
+          </div>
+        )
+      }
+    }
+    class Assignment2 extends React.Component {
+      render() {
+        let figure = [
+          [
+            [1, -2, 0],
+            [1, 2, 0],
+            [-1, 1, 0],
+            [-1, -2, 0],
+            [0, -1, 0],
+          ]
+        ]
+        return (
+          <div>
+            <h1>Лабораторная работа №2</h1>
+            <p style={{fontStyle: "italic"}}>Построеніе 2D-изображеній. Двумѣрныя аффинныя преобразованія</p>
+            <CanvasController figure={figure} width="500" height="400" />
+          </div>
+        )
+      }
+    }
+    class Assignment3 extends React.Component {
+      onRef = ref => { this.canvas = ref }
+      render() {
+        let cube = [
+          [[-50, -50, -50], [-50, -50, 50], [-50, 50, 50], [-50, 50, -50]],
+          [[50, -50, -50], [50, -50, 50], [50, 50, 50], [50, 50, -50]],
+          [[-50, -50, -50], [-50, -50, 50], [50, -50, 50], [50, -50, -50]],
+          [[-50, 50, -50], [-50, 50, 50], [50, 50, 50], [50, 50, -50]],
+          [[-50, -50, -50], [-50, 50, -50], [50, 50, -50], [50, -50, -50]],
+          [[-50, -50, 50], [-50, 50, 50], [50, 50, 50], [50, -50, 50]]
+        ]
+        return (
+          <div>
+            <h1>Лабораторная работа №3</h1>
+            <p style={{fontStyle: "italic"}}>Векторно-полигональная и аналитическая модели объекта. Преобразованія въ пространствѣ</p>
+            <CanvasController figure={cube} width="500" height="400" frameDuration="20" mode="3d" camera={[30, 15]} rotationAxis={[0, 1, 0]} />
+          </div>
+        )
+      }
+    }
+    class WebGLCanvas extends React.Component {
+      canvas = null
+      gl = null
+
+      createShader = (type, source) => {
+        const shader = this.gl.createShader(type)
+        this.gl.shaderSource(shader, source)
+        this.gl.compileShader(shader)
+
+        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+          console.log(this.gl.getShaderInfoLog(shader))
+          this.gl.deleteShader(shader)
+        } else return shader
+      }
+
+      initShaderProgram = shaderSpecs => {
+        const shaderProgram = this.gl.createProgram()
+
+        shaderSpecs
+          .map(spec => this.createShader(...spec))
+          .map(shader => this.gl.attachShader(shaderProgram, shader))
+
+        this.gl.linkProgram(shaderProgram)
+
+        if (!this.gl.getProgramParameter(shaderProgram, this.gl.LINK_STATUS)) {
+          console.log(this.gl.getProgramInfoLog(shaderProgram))
+          return null
+        } else return shaderProgram
+      }
+
+      componentDidMount() {
+        this.gl = this.canvas.getContext("webgl")
+
+        let initBuffers = () => {
+          const positionBuffer = this.gl.createBuffer()
+
+          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, positionBuffer)
+
+          const positions = [
+            -1.0,  1.0,
+            1.0,  1.0,
+            -1.0, -1.0,
+            1.0, -1.0,
+          ]
+
+          this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW)
+
+          return { position: positionBuffer, }
+        }
+
+        let drawScene = (programInfo, buffers) => {
+          this.gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
+          this.gl.clearDepth(1.0);                 // Clear everything
+          this.gl.enable(this.gl.DEPTH_TEST);           // Enable depth testing
+          this.gl.depthFunc(this.gl.LEQUAL);            // Near things obscure far things
+
+          // Clear the canvas before we start drawing on it.
+
+          this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+          // Create a perspective matrix, a special matrix that is
+          // used to simulate the distortion of perspective in a camera.
+          // Our field of view is 45 degrees, with a width/height
+          // ratio that matches the display size of the canvas
+          // and we only want to see objects between 0.1 units
+          // and 100 units away from the camera.
+
+          const fieldOfView = 45 * Math.PI / 180   // in radians
+          const aspect = this.gl.canvas.clientWidth / this.gl.canvas.clientHeight
+          const zNear = 0.1
+          const zFar = 100.0
+          const projectionMatrix = mat4.create()
+          mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar)
+
+          const modelViewMatrix = mat4.create()
+          mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, -6.0])
+
+          // Tell WebGL how to pull out the positions from the position
+          // buffer into the vertexPosition attribute.
+          {
+            const numComponents = 2  // pull out 2 values per iteration
+            const type = this.gl.FLOAT    // the data in the buffer is 32bit floats
+            const normalize = false  // don't normalize
+            const stride = 0         // how many bytes to get from one set of values to the next
+                                      // 0 = use type and numComponents above
+            const offset = 0         // how many bytes inside the buffer to start from
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffers.position)
+            this.gl.vertexAttribPointer(
+              programInfo.attribLocations.vertexPosition,
+              numComponents,
+              type,
+              normalize,
+              stride,
+              offset
+            )
+            this.gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition)
+          }
+
+          this.gl.useProgram(programInfo.program);
+          this.gl.uniformMatrix4fv(
+            programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix
+          );
+          this.gl.uniformMatrix4fv(
+            programInfo.uniformLocations.modelViewMatrix,
+            false,
+            modelViewMatrix
+          );
+
+          {
+            const offset = 0;
+            const vertexCount = 4;
+            this.gl.drawArrays(this.gl.TRIANGLE_STRIP, offset, vertexCount);
+          }
+        }
+
+        let main = () => {
+          // gl.clearColor(0.0, 0.0, 0.0, 1.0)
+          // gl.clear(gl.COLOR_BUFFER_BIT)
+
+          const vsSource = `
+            attribute vec4 aVertexPosition;
+
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+
+            void main() {
+              gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+            }
+          `;
+
+          const fsSource = `
+            void main() {
+              gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            }
+          `;
+
+          const shaderProgram = this.initShaderProgram([
+            [this.gl.VERTEX_SHADER, vsSource],
+            [this.gl.FRAGMENT_SHADER, fsSource]
+          ])
+
+          const programInfo = {
+            program: shaderProgram,
+            attribLocations: {
+              vertexPosition: this.gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            },
+            uniformLocations: {
+              projectionMatrix: this.gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+              modelViewMatrix: this.gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            },
+          }
+
+          const buffers = initBuffers(this.gl)
+
+          drawScene(programInfo, buffers)
+        }
+
+        main()
+      }
+      onRef = (ref) => { this.canvas = ref }
+      render() { return <canvas ref={this.onRef} id="glCanvas" width={this.props.width} height={this.props.height}></canvas> }
+    }
+    class Assignment4 extends React.Component {
+      constructor(props) {
+        super(props)
+        this.state = {
+          selectedShape: "cone",
+          selectedStyle: "wire"
+        }
+      }
+
+      redrawWith = state => { this.setState(state, () => this.drawScene()) }
+      onShapeChange = ({ target: { value } }) => this.redrawWith({ selectedShape: value })
+      onStyleChange = ({ target: { value } }) => this.redrawWith({ selectedStyle: value })
+
+      render() {
+        const shapes = ["cone", "cube", "cylinder", "dodecahedron", "icosahedron", "octahedron", "rhombic_dodecahedron", "sierpinski_sponge", "sphere", "teapot", "tetrahedron", "torus"]
+        const styles = [["wire", "Каркасъ"], ["solid", "Заливка цвѣтомъ"]]
+        let shapeSelector = shapes.map(shape =>
+          <div class="form-check">
+            <label><input type="radio" value={shape} onChange={this.onShapeChange} checked={this.state.selectedShape === shape} /> {shape}</label>
+          </div>
+        )
+        let styleSelector = styles.map(([style, text]) =>
+          <div class="form-check">
+            <label><input type="radio" value={style} onChange={this.onStyleChange} checked={this.state.selectedStyle === style} /> {text}</label>
+          </div>
+        )
+        return (
+          <div>
+            <h1>Лабораторная работа №4</h1>
+            <p style={{fontStyle: "italic"}}>Введеніе въ OpenGL (WebGL)</p>
+            <div style={{display: "flex"}}>
+              <div>
+                <WebGLCanvas width={500} height={400} />
+              </div>
+              <div style={{marginLeft: "10px"}}>
+                <p>Форма
+                  {shapeSelector}
+                </p>
+                <p>Типъ отрисовки
+                  {styleSelector}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    }
+    class Root extends React.Component {
+      render() {
+        return (
+          <div>
+            <Assignment1/>
+            <Assignment2/>
+            <Assignment3/>
+            <Assignment4/>
+          </div>
+        )
+      }
+    }
+    ReactDOM.render(<Root />, document.getElementById('root'));
+  </script>
+</body>
+</html>
